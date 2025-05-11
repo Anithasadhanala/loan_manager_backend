@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LoanStatus {
+  PENDING
+  VERIFIED
+  APPROVED
+  RELEASED
+  OUTSTANDING
+  COMPLETED
+  CANCELLED
+}
+
+/// This table contains check constraints and requires additional setup for migrations. 
+model collaterals {
+  id              Int           @id @default(autoincrement())
+  loan_request_id Int
+  type            String        @db.VarChar(20)
+  document_url    String?       @db.VarChar(255)
+  value_amount    Int
+  loan_requests   loan_requests @relation(fields: [loan_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model disbursements {
+  id              Int           @id @default(autoincrement())
+  loan_request_id Int
+  disbursed_by    Int
+  transaction_id  Int
+  additional_info String?
+  disbursed_at    DateTime      @default(now()) @db.Timestamp(6)
+  users           users         @relation(fields: [disbursed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loan_requests   loan_requests @relation(fields: [loan_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transactions    transactions  @relation(fields: [transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. 
+model emi_schedules {
+  id              Int           @id @default(autoincrement())
+  loan_request_id Int
+  principal       Int
+  interest        Float
+  status          Boolean       @default(false)
+  late_fee        Int?          @default(0)
+  due_date        DateTime      @db.Timestamp(6)
+  loan_requests   loan_requests @relation(fields: [loan_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  repayments      repayments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. 
+model loan_categories {
+  id            Int             @id @default(autoincrement())
+  title         String          @db.VarChar(20)
+  description   String?
+  interest_rate Float
+  max_amount    Int
+  min_amount    Int
+  min_term      Int
+  max_term      Int
+  loan_requests loan_requests[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations.
+model loan_requests {
+  id                                     Int             @id @default(autoincrement())
+  user_id                                Int
+  amount                                 Int
+  loan_category_id                       Int
+  terms                                  Int
+  interest_rate                          Float
+  approved_by                            Int?
+  approved_at                            DateTime?       @db.Timestamp(6)
+  remarks                                String?
+  collaterals                            collaterals[]
+  disbursements                          disbursements[]
+  emi_schedules                          emi_schedules[]
+  status      LoanStatus  @default(PENDING)
+  created_at              DateTime  @default(now()) @db.Timestamp(6)
+   verified_by       Int?
+  verified_at       DateTime?
+  users_loan_requests_approved_byTousers users?          @relation("loan_requests_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loan_categories                        loan_categories @relation(fields: [loan_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_loan_requests_user_idTousers     users           @relation("loan_requests_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  repayments                             repayments[]
+  transactions                           transactions[]
+}
+
+model repayments {
+  id              Int           @id @default(autoincrement())
+  loan_request_id Int
+  emi_schedule_id Int
+  transaction_id  Int
+  emi_schedules   emi_schedules @relation(fields: [emi_schedule_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loan_requests   loan_requests @relation(fields: [loan_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transactions    transactions  @relation(fields: [transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. 
+model transactions {
+  id               Int             @id @default(autoincrement())
+  user_id          Int
+  loan_request_id  Int
+  amount           Int
+  payment_method   String          @db.VarChar(20)
+  status           String          @db.VarChar(20)
+  transaction_date DateTime        @default(now()) @db.Timestamp(6)
+  remarks          String?
+  disbursements    disbursements[]
+  repayments       repayments[]
+  loan_requests    loan_requests   @relation(fields: [loan_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            users           @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model user_details {
+  id             Int     @id @default(autoincrement())
+  user_id        Int     @unique
+  bank_name      String? @db.VarChar(20)
+  account_number String? @db.VarChar(20)
+  ifsc_code      String? @db.VarChar(20)
+  bank_branch    String? @db.VarChar(20)
+  upi            String? @db.VarChar(20)
+  users          users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+model user_roles {
+  user_id Int    @id
+  role    String @db.VarChar(20)
+  users   users  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+
+
+model users {
+  id                                             Int             @id @default(autoincrement())
+  name                                           String?         @db.VarChar(30)
+  email                                          String?         @db.VarChar(30)
+  oauth_id                                       String?         @unique
+  oauth_provider                                 String?         @db.VarChar(20)
+  type                                           String          @db.VarChar(10)
+  active                                         Boolean?        @default(true)
+  created_at                                     DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at                                     DateTime?       @default(now()) @db.Timestamp(6)
+  disbursements                                  disbursements[]
+  loan_requests_loan_requests_approved_byTousers loan_requests[] @relation("loan_requests_approved_byTousers")
+  loan_requests_loan_requests_user_idTousers     loan_requests[] @relation("loan_requests_user_idTousers")
+  transactions                                   transactions[]
+  user_details                                   user_details?
+  user_roles                                     user_roles?     // one-to-one
+}
