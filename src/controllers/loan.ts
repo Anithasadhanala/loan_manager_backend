@@ -3,6 +3,8 @@ import { PrismaClient } from "@prisma/client";
 import {hasAdminPermission} from "../utils/hasAdminPermission"
 import { LoanStatusEnum } from '../constants/enums';
 import { addMonths } from 'date-fns';
+import { LoanStatus } from '@prisma/client';
+
 
 const prisma = new PrismaClient();
 
@@ -317,7 +319,6 @@ export const disburseLoanById = async (req: Request, res: Response): Promise<any
     const userId = req.user?.user_id;
     const role = req.user?.role;
     const loanId = parseInt(req.params.id, 10);
-    console.log(req.body)
     const { payment_method, status } = req.body;
 
     // Ensure only admin can disburse
@@ -377,3 +378,68 @@ export const disburseLoanById = async (req: Request, res: Response): Promise<any
   }
 };
 
+
+export const getMonthlyStats = async (req: Request, res: Response):Promise<any> => {
+  try {
+
+    const userId = req.user?.user_id;
+    const role = req.user?.role;
+
+    // Ensure only admin can disburse stats monthly
+    const isAdmin = await hasAdminPermission(role);
+    if (!isAdmin) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const { year, status } = req.query;
+
+    const rawStatus = Array.isArray(status) ? status[0] : status;
+
+    if (!year || !rawStatus || typeof rawStatus !== 'string') {
+      return res.status(400).json({ message: "Valid year and status are required!" });
+    }
+
+    const allowedStatuses: LoanStatus[] = ["PENDING", "VERIFIED", "RELEASED","OUTSTANDING"];
+    if (!allowedStatuses.includes(rawStatus as LoanStatus)) {
+      return res.status(400).json({ message: "Invalid loan status!" });
+    }
+
+    const loans = await prisma.loan_requests.findMany({
+      where: {
+        status: rawStatus as LoanStatus,
+        approved_at: {
+          gte: new Date(`${year}-01-01T00:00:00.000Z`),
+          lt: new Date(`${+year + 1}-01-01T00:00:00.000Z`)
+        }
+      },
+      select: {
+        amount: true,
+        approved_at: true
+      }
+    });
+
+    const monthlyTotals: { [month: string]: number } = {};
+    for (let i = 1; i <= 12; i++) {
+      const key = i.toString().padStart(2, '0');
+      monthlyTotals[key] = 0;
+    }
+    loans.forEach(loan => {
+      if (loan.approved_at) {
+        const month = new Date(loan.approved_at).getMonth() + 1;
+        const key = month.toString().padStart(2, '0');
+        monthlyTotals[key] += loan.amount;
+      }
+    });
+    
+    return res.status(200).json({
+      year,
+      monthlyDisbursedLoans: monthlyTotals
+    });
+  }catch (error: any) {
+    console.error("Error fetching monthly loan disbursements:", error);
+    return res.status(500).json({
+      message: "Error fetching monthly loan disbursements",
+      error: error.message || "Unknown error",
+    });
+  }
+};
