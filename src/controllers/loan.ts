@@ -398,8 +398,8 @@ export const getMonthlyStats = async (req: Request, res: Response):Promise<any> 
     if (!year || !rawStatus || typeof rawStatus !== 'string') {
       return res.status(400).json({ message: "Valid year and status are required!" });
     }
-
-    const allowedStatuses: LoanStatus[] = ["PENDING", "VERIFIED", "RELEASED","OUTSTANDING"];
+  
+    const allowedStatuses: LoanStatus[] = ["PENDING", "VERIFIED", "RELEASED","OUTSTANDING","COMPLETED"];
     if (!allowedStatuses.includes(rawStatus as LoanStatus)) {
       return res.status(400).json({ message: "Invalid loan status!" });
     }

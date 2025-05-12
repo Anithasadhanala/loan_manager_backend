@@ -5,7 +5,7 @@ import userRoutes from "./routes/userRoutes";
 import loanRoutes from "./routes/loanRoutes";
 
 const app = express();
-const PORT =  3006;
+const PORT =  3007;
 
 
 app.use(cors());
