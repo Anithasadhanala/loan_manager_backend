@@ -10,7 +10,7 @@ router.get("/stats", verifyFirebaseToken, getLoanStats);
 router.get("/monthly-stats", verifyFirebaseToken, getMonthlyStats);
 
 router.post("/", verifyFirebaseToken, validate(createLoanRequest), createLoan);
-router.get("/:id", verifyFirebaseToken, getLoanById);
+router.get("/:id", getLoanById);
 router.get("/", verifyFirebaseToken, getAllLoans);
 router.put("/:id/status", verifyFirebaseToken, validate(updateLoanStatus), updateLoanById);
 router.get("/:id/emi-schedules", verifyFirebaseToken, getAllLoanEmiSchedules);
